@@ -2,7 +2,7 @@
 
 Requirements:
 
-Minikube v1.22+
+Minikube v1.22+  
 Kubectl
 
 
