@@ -21,3 +21,14 @@ In order to test have three terminal windows open:
 
 
 To see the text written on the configmap displayed on the browser, do port-forwarding
+
+
+---
+
+Work in Progress
+
+Convert Bash operator to Golang 
+(reading Kubernetes Operators book)
+
+
+
