@@ -1,0 +1,7 @@
+apiVersion: "ric.com/v1"
+kind: WateringAlarm
+metadata:
+  name: orchid-wateringalarm
+spec:
+  plant: orchid
+  timeinterval: 7

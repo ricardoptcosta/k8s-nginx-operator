@@ -1,0 +1,7 @@
+apiVersion: "ric.com/v1"
+kind: WateringAlarm
+metadata:
+  name: succulent-wateringalarm
+spec:
+  plant: succulent
+  timeinterval: 5
