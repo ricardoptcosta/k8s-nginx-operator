@@ -1,4 +1,4 @@
-# k8s-nginx-operator
+# k8s-wateringalarm-operator
 
 This repo is a step by step approach to creating a kubernetes operator following a natural self discovery path. The end goal here is to create a bad ass operator!
 
@@ -9,9 +9,6 @@ Kubectl
 
 
 ## Attempt 1 
-
-We heard about 
-
 
 This Kubernetes operator creates, updates and deletes Nginx Deployments based on configmaps that are created, updated and deleted.
 
