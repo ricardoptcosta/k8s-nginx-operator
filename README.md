@@ -27,7 +27,7 @@ In order to test have three terminal windows open:
 To see the text written on the configmap displayed on the browser, do port-forwarding
 
 
-# Attempt 2
+## Attempt 2
 
 Using an existing kubernetes resources like a ConfigMap is cool, but what I would really like to do is to create my own custom resource. What's simple and useful?
 
@@ -59,19 +59,19 @@ Sweet lord, my watering alarms are working and my operator is making sure any cr
 TODO -------------- For the credentials I used a secret. IF HAVE TIME REVISE THIS LAST BIT
 
 
-# Attempt 3
+## Attempt 3
 
 Bash is nice, but I hear Kubernetes is written in Go. Can I write an operator in Go?
 
-# Attempt 4
+## Attempt 4
 
 I'm running these operators locally which is fine for development and tests. But if I want to deploy to a massive Kubernetes cluster in production, I need to containerize it.
 
-# Attempt 5
+## Attempt 5
 
 My buddies from my Spring Boot days don't feel like learning Go but are interested in taking advantage of Operator pattern in k8s. I ask them why and they tell me that having to manually spin up new MySql databases is driving them nuts. They heard operators can automate this away: not just create the databases but also initialize them.
 
-# Attempt 6
+## Attempt 6
 
 I hear I can manipulate objects outside the Kubernetes cluster. Huh?
 
