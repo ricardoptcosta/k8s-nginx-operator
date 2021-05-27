@@ -63,15 +63,32 @@ TODO -------------- For the credentials I used a secret. IF HAVE TIME REVISE THI
 
 Bash is nice, but I hear Kubernetes is written in Go. Can I write an operator in Go?
 
+--- USE GO SDK
+
 ## Attempt 4
 
-I'm running these operators locally which is fine for development and tests. But if I want to deploy to a massive Kubernetes cluster in production, I need to containerize it.
+My friend told me he used Kubebuilder to scaffold his operator. Shall we try? 
+
+--- USE Kubebuilder
 
 ## Attempt 5
 
-My buddies from my Spring Boot days don't feel like learning Go but are interested in taking advantage of Operator pattern in k8s. I ask them why and they tell me that having to manually spin up new MySql databases is driving them nuts. They heard operators can automate this away: not just create the databases but also initialize them.
+My friend's dad told us nobody ain't got time for that and he simply uses the operator-sdk. Could it be that great?
+
+--- USE OPERATOR SDK
 
 ## Attempt 6
+
+
+I'm running these operators locally which is fine for development and tests. But if I want to deploy to a massive Kubernetes cluster in production, I need to containerize it.
+
+## Attempt 7
+
+My buddies from my Spring Boot days don't feel like learning Go but are interested in taking advantage of Operator pattern in k8s. I ask them why and they tell me that having to manually spin up new MySql databases is driving them nuts. They heard operators can automate this away: not just create the databases but also initialize them.
+
+--- USE JAVA OPERATOR SDK
+
+## Attempt 8
 
 I hear I can manipulate objects outside the Kubernetes cluster. Huh?
 
