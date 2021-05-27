@@ -58,37 +58,39 @@ Sweet lord, my watering alarms are working and my operator is making sure any cr
 
 TODO -------------- For the credentials I used a secret. IF HAVE TIME REVISE THIS LAST BIT
 
+## Attempt 3 (to be confirmed)
+Same as attempt 2 but to implement a mysql database
 
-## Iteration 3
+## Iteration 4
 
 Bash is nice, but I hear Kubernetes is written in Go. Can I write an operator in Go?
 
 --- USE GO SDK
 
-## Iteration 4
+## Iteration 5
 
 My friend told me he used Kubebuilder to scaffold his operator. Shall we try? 
 
 --- USE Kubebuilder
 
-## Iteration 5
+## Iteration 6
 
 My friend's dad told us nobody ain't got time for that and he simply uses the operator-sdk. Could it be that great?
 
 --- USE OPERATOR SDK
 
-## Iteration 6
+## Iteration 7
 
 
 I'm running these operators locally which is fine for development and tests. But if I want to deploy to a massive Kubernetes cluster in production, I need to containerize it.
 
-## Iteration 7
+## Iteration 8
 
 My buddies from my Spring Boot days don't feel like learning Go but are interested in taking advantage of Operator pattern in k8s. I ask them why and they tell me that having to manually spin up new MySql databases is driving them nuts. They heard operators can automate this away: not just create the databases but also initialize them.
 
 --- USE JAVA OPERATOR SDK
 
-## Iteration 8
+## Iteration 9
 
 I hear I can manipulate objects outside the Kubernetes cluster. Huh?
 
