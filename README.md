@@ -58,8 +58,8 @@ Sweet lord, my watering alarms are working and my operator is making sure any cr
 
 TODO -------------- For the credentials I used a secret. IF HAVE TIME REVISE THIS LAST BIT
 
-## Attempt 3 (to be confirmed)
-Same as attempt 2 but to implement a mysql database
+## Iteration 3 (to be confirmed)
+Same as iteration 2 but to implement a mysql database
 
 ## Iteration 4
 
