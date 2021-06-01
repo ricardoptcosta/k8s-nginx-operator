@@ -1,0 +1,7 @@
+domain: ricardoptcosta.github.io
+repo: wateringalarm
+resources:
+- group: alarm
+  kind: WateringAlarm
+  version: v1alpha1
+version: "2"

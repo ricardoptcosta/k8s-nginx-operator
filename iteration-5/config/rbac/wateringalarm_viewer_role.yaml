@@ -1,0 +1,20 @@
+# permissions for end users to view wateringalarms.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wateringalarm-viewer-role
+rules:
+- apiGroups:
+  - alarm.ricardoptcosta.github.io
+  resources:
+  - wateringalarms
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - alarm.ricardoptcosta.github.io
+  resources:
+  - wateringalarms/status
+  verbs:
+  - get

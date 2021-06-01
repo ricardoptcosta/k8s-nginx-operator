@@ -69,9 +69,25 @@ Bash is nice, but I hear Kubernetes is written in Go. Can I write an operator in
 
 ## Iteration 5
 
-My friend told me he used Kubebuilder to scaffold his operator. Shall we try? 
+My friend told me he used *Kubebuilder* to scaffold his operator. Shall we try? 
+First think, we have to install kubebuilder and Kustomize. Why both?
 
---- USE Kubebuilder
+I am starting the project by initializating an empty project. I used iteration5/ as the root of the project.
+
+`go mod init wateringalarm`
+
+Then I initialize the controller project. What is the controller?
+
+`kubebuilder init --domain ricardoptcosta.github.io`
+
+Then I ask Kubebuilder to scaffold a Kubernetes API by creating a Custom Resource Definition and the Controller.
+
+`kubebuilder create api --resource --controller --group alarm --version v1alpha1 --kind WateringAlarm `
+Following Kubebuilder help page, I then edit the API scheme on `api/v1alpha1/wateringalarm_types.go. In the struct WateringAlarmSpec I replace the Foo field with the fields Plant and TimeInterval.
+
+Then, edit the controller in `controllers/wateringalarm_controller.go`. In particular, implement the operator's logic in the Reconcile function
+
+
 
 ## Iteration 6
 

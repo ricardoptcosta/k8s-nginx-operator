@@ -1,0 +1,7 @@
+apiVersion: alarm.ricardoptcosta.github.io/v1alpha1
+kind: WateringAlarm
+metadata:
+  name: wateringalarm-sample
+spec:
+  # Add fields here
+  foo: bar
