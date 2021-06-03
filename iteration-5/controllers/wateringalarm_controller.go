@@ -38,10 +38,13 @@ type WateringAlarmReconciler struct {
 // +kubebuilder:rbac:groups=alarm.ricardoptcosta.github.io,resources=wateringalarms/status,verbs=get;update;patch
 
 func (r *WateringAlarmReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	_ = r.Log.WithValues("wateringalarm", req.NamespacedName)
+	ctx = context.Background()
+	log = r.Log.WithValues("wateringalarm", req.NamespacedName)
 
-	// your logic here
+	var *wateringAlarm alarmv1alpha1.WateringAlarm
+	if err:=r.Get(ctx, req.NamespacedName, &wateringAlarm); err != nill{
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
 	return ctrl.Result{}, nil
 }

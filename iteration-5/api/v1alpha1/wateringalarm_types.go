@@ -20,26 +20,32 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // WateringAlarmSpec defines the desired state of WateringAlarm
 type WateringAlarmSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Plant string `json:"plant,omitempty"`
 
-	// Foo is an example field of WateringAlarm. Edit WateringAlarm_types.go to remove/update
-	Plant string `json:"foo,omitempty"`
-	TimeInterval string `json:"foo,omitempty"`
+        //+kubebuilder:validation:Minimum=0
+	TimeInterval int `json:"timeinterval,omitempty"`
 }
 
 // WateringAlarmStatus defines the observed state of WateringAlarm
 type WateringAlarmStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	LastWateringDate string `json:"lastwateringdate,omitempty"`
+	NextWateringDate string `json:"nextwateringdate,omitempty"`
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:JSONPath=".spec.plant",name=PLANT,type=string
+// +kubebuilder:printcolumn:JSONPath=".spec.timeinterval",name=TIME INTERVAL,type=integer
+// +kubebuilder:printcolumn:JSONPath=".status.lastwateringdate",name=LAST WATERING DATE,type=string
+// +kubebuilder:printcolumn:JSONPath=".spec.nextwateringdate",name=NEXT WATERING DATE,type=string
 
 // WateringAlarm is the Schema for the wateringalarms API
 type WateringAlarm struct {

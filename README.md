@@ -76,14 +76,124 @@ I am starting the project by initializating an empty project. I used iteration5/
 
 `go mod init wateringalarm`
 
-Then I initialize the controller project. What is the controller?
+The above command creates the go.mod file which will contain the project dependencies among other details.
+
+Then I initialize the project. 
 
 `kubebuilder init --domain ricardoptcosta.github.io`
 
+At this point I have the following folder structure:
+
+	.
+	├── bin
+	│   └── manager
+	├── config
+	│   ├── certmanager
+	│   ├── default
+	│   ├── manager
+	│   ├── prometheus
+	│   ├── rbac
+	│   └── webhook
+	├── Dockerfile
+	├── go.mod
+	├── go.sum
+	├── hack
+	│   └── boilerplate.go.txt
+	├── main.go
+	├── Makefile
+	└── PROJECT
+
 Then I ask Kubebuilder to scaffold a Kubernetes API by creating a Custom Resource Definition and the Controller.
 
-`kubebuilder create api --resource --controller --group alarm --version v1alpha1 --kind WateringAlarm `
-Following Kubebuilder help page, I then edit the API scheme on `api/v1alpha1/wateringalarm_types.go. In the struct WateringAlarmSpec I replace the Foo field with the fields Plant and TimeInterval.
+`kubebuilder create api --resource --controller --group alarm --version v1alpha1 --kind WateringAlarm `  
+
+This command creates the `api` and `controllers` folders. At this point I have the following folder strcuture:
+
+    .
+    ├── api
+    │   └── v1alpha1
+    │       ├── groupversion_info.go
+    │       ├── wateringalarm_types.go
+    │       └── zz_generated.deepcopy.go
+    ├── bin
+    │   └── manager
+    ├── config
+    │   ├── certmanager
+    │   │   ├── certificate.yaml
+    │   │   ├── kustomization.yaml
+    │   │   └── kustomizeconfig.yaml
+    │   ├── crd
+    │   │   ├── kustomization.yaml
+    │   │   ├── kustomizeconfig.yaml
+    │   │   └── patches
+    │   │       ├── cainjection_in_wateringalarms.yaml
+    │   │       └── webhook_in_wateringalarms.yaml
+    │   ├── default
+    │   │   ├── kustomization.yaml
+    │   │   ├── manager_auth_proxy_patch.yaml
+    │   │   ├── manager_webhook_patch.yaml
+    │   │   └── webhookcainjection_patch.yaml
+    │   ├── manager
+    │   │   ├── kustomization.yaml
+    │   │   └── manager.yaml
+    │   ├── prometheus
+    │   │   ├── kustomization.yaml
+    │   │   └── monitor.yaml
+    │   ├── rbac
+    │   │   ├── auth_proxy_client_clusterrole.yaml
+    │   │   ├── auth_proxy_role_binding.yaml
+    │   │   ├── auth_proxy_role.yaml
+    │   │   ├── auth_proxy_service.yaml
+    │   │   ├── kustomization.yaml
+    │   │   ├── leader_election_role_binding.yaml
+    │   │   ├── leader_election_role.yaml
+    │   │   ├── role_binding.yaml
+    │   │   ├── wateringalarm_editor_role.yaml
+    │   │   └── wateringalarm_viewer_role.yaml
+    │   ├── samples
+    │   │   └── alarm_v1alpha1_wateringalarm.yaml
+    │   └── webhook
+    │       ├── kustomization.yaml
+    │       ├── kustomizeconfig.yaml
+    │       └── service.yaml
+    ├── controllers
+    │   ├── suite_test.go
+    │   └── wateringalarm_controller.go
+    ├── Dockerfile
+    ├── go.mod
+    ├── go.sum
+    ├── hack
+    │   └── boilerplate.go.txt
+    ├── main.go
+    ├── Makefile
+    └── PROJECT
+      
+
+Following Kubebuilder help page, I then edit the API scheme on `api/v1alpha1/wateringalarm_types.go`. In the struct WateringAlarmSpec I replace the Foo field with the fields Plant and TimeInterval.
+Change this section of the code  
+`$ vim api/v0alpha1/wateringalarm_types.go`
+```golang
+27 type WateringAlarmSpec struct {
+28         // INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+29         // Important: Run "make" to regenerate code after modifying this file
+30 
+31         // Foo is an example field of WateringAlarm. Edit WateringAlarm_types.go to remove/updat    e
+32         Foo string `json:"foo,omitempty"`
+33 }
+```
+into
+```golang
+ 27 type WateringAlarmSpec struct {
+ 28         Plant string `json:"plant,omitempty"`
+ 29
+ 30         //+kubebuilder:validation:Minimum=0
+ 31         TimeInterval int32 `json:"timeinterval,omitempty"`
+ 32 }
+
+```
+Note that on that file, `wateringalarm_types.go`, we only edit the Spec of the custom resource. The actual WateringAlarm struct, further down on the file, only makes use of the WateringAlarmSpec and WateringAlarmStatus structs. Also, I add a marker that ensures that TimeInterval is bounded at zero.
+
+Run `make manifests` to create the CRD.
 
 Then, edit the controller in `controllers/wateringalarm_controller.go`. In particular, implement the operator's logic in the Reconcile function
 

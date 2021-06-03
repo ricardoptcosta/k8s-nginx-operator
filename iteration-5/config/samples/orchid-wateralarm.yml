@@ -1,0 +1,7 @@
+apiVersion: "alarm.ricardoptcosta.github.io/v1alpha1"
+kind: WateringAlarm
+metadata:
+  name: orchid-wateringalarm
+spec:
+  plant: orchid
+  timeinterval: 6
