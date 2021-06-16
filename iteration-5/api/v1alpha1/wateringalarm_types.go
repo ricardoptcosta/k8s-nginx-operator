@@ -20,7 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -28,7 +27,7 @@ import (
 type WateringAlarmSpec struct {
 	Plant string `json:"plant,omitempty"`
 
-        //+kubebuilder:validation:Minimum=0
+	//+kubebuilder:validation:Minimum=0
 	TimeInterval int `json:"timeinterval,omitempty"`
 }
 

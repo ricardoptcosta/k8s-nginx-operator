@@ -1,4 +1,4 @@
-apiVersion: "alarm.ricardoptcosta.github.io/v1alpha1"
+apiVersion: alarm.ricardoptcosta.github.io/v1alpha1
 kind: WateringAlarm
 metadata:
   name: orchid-wateringalarm

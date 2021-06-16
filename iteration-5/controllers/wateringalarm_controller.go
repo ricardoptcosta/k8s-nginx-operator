@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -38,11 +37,14 @@ type WateringAlarmReconciler struct {
 // +kubebuilder:rbac:groups=alarm.ricardoptcosta.github.io,resources=wateringalarms/status,verbs=get;update;patch
 
 func (r *WateringAlarmReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx = context.Background()
-	log = r.Log.WithValues("wateringalarm", req.NamespacedName)
+	ctx := context.Background()
+	log := r.Log.WithValues("wateringalarm", req.NamespacedName)
 
-	var *wateringAlarm alarmv1alpha1.WateringAlarm
-	if err:=r.Get(ctx, req.NamespacedName, &wateringAlarm); err != nill{
+	log.Info("Hello from Logger", "name", req.NamespacedName)
+
+	var wateringAlarm alarmv1alpha1.WateringAlarm
+	if err := r.Get(ctx, req.NamespacedName, &wateringAlarm); err != nil {
+		log.Info("error gettinb object", "name", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
