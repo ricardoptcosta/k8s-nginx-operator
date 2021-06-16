@@ -10,6 +10,96 @@ Kubectl
 
 ## Iteration 1 
 
+What is a Kubernetes operator? People at the office keep talking about it. There are a few concepts I hear that make sense. I hear it takes advantage of Kubernetes control-loop. The control-loop is a mechanism by which Kubernetes compares a desired state of the world with the real state of the world.Take for instance a deployment with 3 pod replicas. Whenever I manually destroy a pod in my local Minikube cluster, another one will be spun off if that pod. Here, initially, the desired state of the world matched the real state of the world, ie, 3 pods. However, once I destroy a pod, the real state of the world is now only 2 pods. As such, the control loop needs to reconcile this mismatch what is desired and what is real. Now, this concept is implemented via a Kubernetes component called the Deployment Controller. This controller watches for any changes both on the resource specifications and on the cluster deployed resources. This is it! Ignoring for now the role of the ReplicaSet controller, the Deployment controller informs the scheduler that it needs to assign a new pod to a suitable node. The scheduler then lets the api server which kubelet it has to instruct to create a new pod.
+
+This is a bit intense. Maybe a simple drawing would help clear it out.
+
+DEPLOYMENT CONTROLLER FLOW SKETCH HERE
+
+I don't know how this deployment controller is implemented, but I think that maybe I could create one myself. This is a big challenge. Where shall I put it? 
+
+I will create a script which will watch for any updates on how many pods of Nginx I want running. How do I pass this information? Configmaps are used to pass information around, so maybe I can use that. I will create a sample configmap yaml which will convey the number of nginx replicas that I want. 
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ricardosdeployment
+data:
+  ricardosReplicas: "3" 
+```
+
+Awesome stuff, now that I have the piece of information that I want and the transmission vessel, let's get onto the script. I will use `bash` as I need to use `kubectl` and I'm not particularly familiar with language specific [Kubernetes client libraries](https://kubernetes.io/docs/reference/using-api/client-libraries/). 
+
+I need to start the script by telling the api server to look for new configmaps, as well as updates and deletions. 
+
+`iteration-0/operator.sh`
+```bash
+kubectl get --watch --output-watch-events configmap -o=custom-columns=TYPE:type,NAME:object.metadata.name,REPLICAS:object.data.ricardosReplicas 
+```
+
+With two terminals open, I can run the `kubectl` in one and then I can apply the `sample-configmap.yml` on the other one. On the former, I see it delivers a table in our familiar `kubectl` output format and there it is, a line which states that the configmap regarding ricardosdeployment was added to the configmap resources.
+
+  | TYPE  | NAME               | REPLICAS |
+  |--|--|--|
+  | ADDED | kube-root-ca.crt   | \<none>   |
+  | ADDED | ricardosdeployment | 3        |
+  |       |                    |          |
+
+This is great. I now want to transpose this information to a replicaset which will create or delete pods in order to make my wishes come true.
+
+To do so, I add a few line to my script which do the following: 
+
+1. fetch the pieces of data I care about and store them in the variables EVENT, NAME and REPLICAS. With such information, whenever an EVENT takes place to any configmap, for instance whenever I modify the number of replicas from 3 to 2, this script will run and will apply the changes to the real world via a heredoc. If the replicaset already exists it will be updated or deleted. If it doesn't it will be created. 
+
+`iteration-0/operator.sh`
+```bash
+kubectl get --watch --output-watch-events configmap -o=custom-columns=type:type,name:object.metadata.name,replicas=object.data.customReplicas --no-headers | \
+	while read next; do
+    EVENT=$(echo $next | cut -d' ' -f1)
+		NAME=$(echo $next | cut -d' ' -f2)
+    REPLICAS=$(echo $next | cut -d' ' -f3)
+	
+		case $EVENT in
+                  ADDED|MODIFIED)
+			  kubectl apply -f - << EOF
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: $NAME
+  labels:
+    app: $NAME
+spec:
+  replicas: $REPLICAS
+  selector:
+    matchLabels:
+      app: $NAME
+  template:
+    metadata:
+      labels:
+        app: $NAME
+    spec:
+      containers:
+      - name: nginx-webserver
+        image: nginx
+
+EOF
+			   ;;
+					DELETED)
+                    kubectl delete replicaset $NAME
+                    ;;
+          esac
+done
+``` 
+
+
+Let's test our baby. 
+
+
+
+
+------iteration 2
+
 This Kubernetes operator creates, updates and deletes Nginx Deployments based on configmaps that are created, updated and deleted.
 
 In order to test have three terminal windows open:
@@ -29,7 +119,11 @@ To see the text written on the configmap displayed on the browser, do port-forwa
 
 ## Iteration 2
 
+
 Using an existing kubernetes resources like a ConfigMap is cool, but what I would really like to do is to create my own custom resource. What's simple and useful?
+
+------ This is powerful, but I still don't get how can I use this to my advantage. All I learnt is that Deployments take care of making sure the number of pods running match what I want. What I came to realise is that the key thing is, that I can apply this same rationale to any other type of objects ---
+
 
 I love plants. I have many plants. I forget to water them when I should. They die. I get sad. I need to address this so that I can get my life in order. Could a Kubernetes CustomResourceDefinition come to the rescue?
 
