@@ -48,13 +48,13 @@ With two terminals open, I can run the `kubectl` in one and then I can apply the
 
 This is great. I now want to transpose this information to a replicaset which will create or delete pods in order to make my wishes come true.
 
-To do so, I add a few line to my script which do the following: 
+To do so, I add a few lines to my script which do the following: 
 
 1. fetch the pieces of data I care about and store them in the variables EVENT, NAME and REPLICAS. With such information, whenever an EVENT takes place to any configmap, for instance whenever I modify the number of replicas from 3 to 2, this script will run and will apply the changes to the real world via a heredoc. If the replicaset already exists it will be updated or deleted. If it doesn't it will be created. 
 
 `iteration-0/operator.sh`
 ```bash
-kubectl get --watch --output-watch-events configmap -o=custom-columns=type:type,name:object.metadata.name,replicas=object.data.customReplicas --no-headers | \
+kubectl get --watch --output-watch-events configmap -o=custom-columns=TYPE:type,NAME:object.metadata.name,REPLICAS=object.data.ricardoReplicas --no-headers | \
 	while read next; do
     EVENT=$(echo $next | cut -d' ' -f1)
 		NAME=$(echo $next | cut -d' ' -f2)
@@ -93,10 +93,73 @@ done
 ``` 
 
 
-Let's test our baby. 
+Let's test our baby.  Start by opening three terminal windows. Then, do the following. In window 1 let's run the operator:  
+`$ bash iteration-0/operator.sh`     
+      
+Oops!  What's this?
+```bash 
+The connection to the server localhost:8080 was refused - did you specify the right host or port?
+```
+In this case, we get this error because we aren't linked to any Kubernetes cluster. We forgot to start minikube. Easy, let's run (from any location):   
+`$ minikube start` 
 
+This command automatically sets `kubectl` config file to point to Minikube's cluster. We run the `bash` command again. Sweet! The operator is running. Now, all we need is to create a configmap with the appropriate format. On window 2 let's create a configmap using our `sample-configmap.yml`:
 
+`$ kubectl apply -f iteration-0/sample-configmap.yml`
 
+We get 
+```bash
+configmap/ricardosdeployment created
+```
+Nice! Let's check whether a replicaset was created and with how many replicas it.
+`$ kubectl get replicasets`
+
+```bash
+NAME                 DESIRED   CURRENT   READY   AGE
+kube-root-ca.crt     1         1         1       12m
+ricardosdeployment   3         3         3       10s
+```
+Booyakasha! We've got a replicaset with 3 pods desired and running! Out of curiosity let's see each of the pods.
+
+`$ kubectl get pods`
+
+```bash
+NAME                       READY   STATUS    RESTARTS   AGE
+kube-root-ca.crt-7twj5     1/1     Running   0          12m
+ricardosdeployment-5ds8m   1/1     Running   0          25s
+ricardosdeployment-h87tq   1/1     Running   0          25s
+ricardosdeployment-nls2b   1/1     Running   0          25s
+
+```
+
+Bazinga! Let's update our `sample-configmap.yml` to the have only two replicas instead of three. 
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ricardosdeployment
+data:
+  ricardosReplicas: "2" //changed from "3" 
+```
+
+Apply that file 
+
+`$ kubectl apply -f iteration-0/sample-configmap.yml`
+
+and check how many pods we have now
+
+```bash
+NAME                       READY   STATUS        RESTARTS   AGE
+kube-root-ca.crt-7twj5     1/1     Running       0          15m
+ricardosdeployment-5ds8m   1/1     Running       0          3m17s
+ricardosdeployment-h87tq   1/1     Running       0          3m17s
+ricardosdeployment-nls2b   0/1     Terminating   0          3m17s
+```
+Victory! One of the three pods is terminating which will leave us with two pods running just as expected.
+ 
+
+<!-- 
 
 ------iteration 2
 
@@ -114,41 +177,256 @@ In order to test have three terminal windows open:
   - $ kubectl get deployments
 
 
-To see the text written on the configmap displayed on the browser, do port-forwarding
+To see the text written on the configmap displayed on the browser, do port-forwarding -->
 
 
 ## Iteration 2
 
 
-Using an existing kubernetes resources like a ConfigMap is cool, but what I would really like to do is to create my own custom resource. What's simple and useful?
+Using an existing kubernetes resources like a ConfigMap is cool. However I can see already a problem. If I were to create a configmap with any other purpose, it would still be picked up by our operator and unpredictable behaviour could follow. In particular, it is easy to imagine unwanted replicasets and pods being created. 
 
------- This is powerful, but I still don't get how can I use this to my advantage. All I learnt is that Deployments take care of making sure the number of pods running match what I want. What I came to realise is that the key thing is, that I can apply this same rationale to any other type of objects ---
+What we really need to do is to create our own custom resource, so that our operator only pays atention to it. 
+
+I could create a new **Custom Resource Definition (CRD)** which would define these new resources. I could now create RicardosConfigMaps for instance. But wait, I can feel that this is powerful, but I still don't get how can I use this to my advantage. All I learnt is that this operator can take care of making sure the number of pods running match what I want. What I came to realise is that the key thing is: I can apply this same rationale to any other type of objects. What object would be simple and useful?
 
 
-I love plants. I have many plants. I forget to water them when I should. They die. I get sad. I need to address this so that I can get my life in order. Could a Kubernetes CustomResourceDefinition come to the rescue?
+I love plants. I have many plants. I forget to water them when I should. They die. I get sad. I need to address this so that I can get my life in order. Could a Kubernetes Watering Alarm Custom Resource come to the rescue? Just to make clear, there is not Kubernetes Watering Alarm. I will have to create this type of resource by creating the aforementioned CustomResourceDefinition.
 
-- Create CRD and deploy it
-  1. Create CRD wateringalarm-crd.yml
-  2. Run `$ kubectl apply -f iteration-2/wateringalarm-crd.yml`
+I start by creating a CRD. Below is the full yaml
 
-Boom! We have a new CRD. Check `$ kubectl api-resources` to double check we have `wateringalarms` as a new api resource
+```yaml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: wateringalarms.ric.com
+spec:
+  group: ric.com
+  names:
+    kind: WateringAlarm
+    plural: wateringalarms
+    listKind: WateringAlarmList
+    singular: wateringalarm
+  scope: Namespaced
+  versions:
+  - name: v1
+    # Each version can be enabled/disabled by Served flag.
+    served: true
+    # One and only one version must be marked as the storage version.
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              plant:
+                type: string
+                description: Type of plant
+              timeinterval:
+                type: integer
+                description: Interval between watering
+    additionalPrinterColumns:
+      - name: Plant
+        jsonPath: .spec.plant
+        type: string
+      - name: TimeInterval
+        jsonPath: .spec.timeinterval
+        type: string
+      - name: Age
+        jsonPath: .metadata.creationTimestamp
+        type: date
+```
 
-- Create custom resources of type WateringAlarm. In this case we will build an alarm for orchids and succulents
-  1. Create orchid-wateringalarm.yml and succulent-wateringalarm.yml
-  2. Run  `$ kubectl apply -f iteration-2/orchid-wateringalarm.yml && kubectl apply -f iteration-2/succulent-wateringalarm.yml`
+CustomResourceDefinitions let the Kubernetes Api Server know what properties custom resources have. In this case, a WateringAlarm will have two base properties: `plant` which states the type of plant this alarm refers to and `timeinterval` which states the time interval in days between waterings.
 
-Now, I have the resources created, how do I take advantage of the operator pattern to leverage them?
-- Create a watcher on the operator
-- Do something when the the watcher identifies a change
+<!-- Note that there is a block called `additionalPrinterColumns`. This block reper -->
 
-This is exactly the same as on iteration-1, now with my beautiful custom resource. See iteration-2/operator.sh for my implementation.
+Let's deploy it:
 
-After launching the watcher I create a loop that deploys or updates a cronjob whenever a WateringAlarm is created/updated. It deletes the cronjob whenever a WateringAlarm resource is deleted.
+`$ kubectl apply -f iteration-2/wateringalarm-crd.yml`
 
-Since I need the container created by the cronjob to send me an email reminding me about watering the plants, I used an ubuntu image and installed ssmpt. There is a bunch of configuration required for the email protocol. See this [link](https://www.havetheknowhow.com/Configure-the-server/Install-ssmtp.html). Following that link, I created a configmap from the files `/etc/ssmtp/revaliases` and ` /etc/ssmtp/ssmtp.conf` and pasted it on the `operator.sh file` with the name `ssmtp-conf`. These files were then mounted on the containter via the configmap. I used a Gmail account to act as my email server.
+Boom! We have a new CRD. Check `$ kubectl api-resources` to double check we have `wateringalarms` as a new api resource. 
+
+```bash
+NAME              SHORTNAMES   APIVERSION         NAMESPACED   KIND
+
+...
+
+wateringalarms                 ric.com/           true         WateringAlarm
+
+...
+```
+
+
+All custom resource definitions can also be listed with `$ kubectl get crds`.
+
+```bash
+NAME                     CREATED AT
+wateringalarms.ric.com   2021-06-17T13:29:57Z
+```
+
+Now, we can go ahead and create custom resources of type WateringAlarm. In this case we will build an alarms for orchids and succulents. 
+
+`iteration-1/orchid-wateringalarm.yml`
+```yaml
+apiVersion: "ric.com/v1"
+kind: WateringAlarm
+metadata:
+  name: orchid-wateringalarm
+spec:
+  plant: orchid
+  timeinterval: 7
+```
+and
+
+`iteration-1/succulent-wateringalarm.yml`
+```yaml
+apiVersion: "ric.com/v1"
+  kind: WateringAlarm
+  metadata:
+    name: succulent-wateringalarm
+  spec:
+    plant: succulent
+    timeinterval: 5
+
+```
+These reflect the fact that succulents need watering every five days while orchids once a week. Now, I create these resources:
+
+`$ kubectl apply -f iteration-2/orchid-wateringalarm.yml && kubectl apply -f iteration-2/succulent-wateringalarm.yml`
+
+And let's check what happens when:
+
+`$ kubectl get wateringalarms`
+```bash
+NAME                      PLANT       TIMEINTERVAL   AGE
+orchid-wateringalarm      orchid      7              12s
+succulent-wateringalarm   succulent   5              12s
+```
+
+Neat!
+
+Now, I have the resources created, how do I take advantage of the operator pattern to leverage them? Easy, same as before:
+1. Create a watcher on the operator
+2. Do something when the the watcher identifies a change
+
+This is exactly the same as on iteration-1, now with my beautiful custom resource. Let's look at the operator.
+
+`iteration-2/operator.sh`
+
+```bash
+#!/usr/bin/env bash
+
+kubectl get --watch --output-watch-events wateringalarm \
+-o=custom-columns=type:type,name:object.metadata.name,plant:object.spec.plant,timeinterval:object.spec.timeinterval --no-headers	| \
+	while read next; do
+		PLANT=$(echo $next | cut -d' ' -f3)
+    EVENT=$(echo $next | cut -d' ' -f1)
+	  TIMEINTERVAL=$(echo $next | cut -d' ' -f4)
+		case $EVENT in
+                  ADDED|MODIFIED)
+        kubectl apply -f - << EOF
+apiVersion: v1
+data:
+  revaliases: "# sSMTP aliases\n# \n# Format:\tlocal_account:outgoing_address:mailhub\n#\n#
+    Example: root:your_login@your.domain:mailhub.your.domain[:port]\n# where [:port]
+    is an optional port number that defaults to 25.\n\nroot:<YOUR-GMAIL-USERNAME>@gmail.com:smtp.gmail.com:587\n"
+  ssmtp.conf: "#\n# Config file for sSMTP sendmail\n#\n# The person who gets all mail
+    for userids < 1000\n# Make this empty to disable rewriting.\nroot=<YOUR-GMAIL-USERNAME>@gmail.com\n\n#
+    The place where the mail goes. The actual machine name is required no \n# MX records
+    are consulted. Commonly mailhosts are named mail.domain.com\n#mailhub=mail\nmailhub=smtp.gmail.com:587\n\nAuthUser=<YOUR-GMAIL-USERNAME>@gmail.com\nAuthPass=<YOUR-GMAIL-PASSWORD>\nUseTLS=YES\nUseSTARTTLS=YES\n\n#
+    Where will the mail seem to come from?\n#rewriteDomain=\nrewriteDomain=gmail.com\n\n#
+    The full hostname\n#hostname=ric-ThinkPad-X1-Carbon-6th\n#hostname=<YOUR-GMAIL-USERNAME>@gmail.com\nhostname=localhost\n\n#
+    Are users allowed to set their own From: address?\n# YES - Allow the user to specify
+    their own From: address\n# NO - Use the system generated From: address\nFromLineOverride=YES\n\n"
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: ssmtp-conf
+
+EOF
+
+			  kubectl apply -f - << EOF
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: $PLANT
+spec:
+  jobTemplate:
+    metadata:
+      name: $PLANT
+    spec:
+      backoffLimit: 5
+      activeDeadlineSeconds: 30
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - image: ubuntu
+            name: $PLANT
+            command:
+            - /bin/sh
+            - -c
+            - apt-get update && apt-get --assume-yes install ssmtp && cp /etc/ssmtp-temp/ssmtp.conf /etc/ssmtp/ssmtp.conf && cp /etc/ssmtp-temp/revaliases /etc/ssmtp/revaliases.conf && echo "Get your bum out of the sofa Ricardo, it's time to water the ${PLANT}s" | ssmtp <YOUR-GMAIL-USERNAME>@gmail.com
+            volumeMounts:
+            - name: ssmtp-conf
+              mountPath: /etc/ssmtp-temp
+          volumes:
+            - name: ssmtp-conf
+              configMap:
+                name: ssmtp-conf
+  schedule: "0 0 */$TIMEINTERVAL * *"
+
+EOF
+			   ;;
+					DELETED)
+                    kubectl delete cronjob $PLANT
+                    kubectl delete configmap ssmtp-conf
+                    ;;
+          esac
+done
+
+```
+This is a more intense file. However, the principles are the same.
+There is a watcher and there is stuff that is done whenever a custom resource is created, updated or deleted. The custom resource here refers to a WateringAlarm. The stuff that is done refers to the creation, update or deletion of a configmap and a cronjob. Any time a a WateringAlarm is created or updated the watcher deploys or updates a cronjob which will be triggered every time the `timeinterval` defined in the WateringAlarm runs out. It deletes the cronjob whenever a WateringAlarm resource is deleted. 
+
+Since I need the container created by the cronjob to notify me somehow, I decided to use my Gmail account as an email server. In order to send me an email reminding me about watering the plants, I used an ubuntu image and installed ssmpt. There is a bunch of configuration required for the email protocol. See this [link](https://www.havetheknowhow.com/Configure-the-server/Install-ssmtp.html). Following that link, I created a configmap from the files `/etc/ssmtp/revaliases` and ` /etc/ssmtp/ssmtp.conf` and pasted it on the `iteration-2/operator.sh` file with the name `ssmtp-conf`. All in all,these files were mounted on the containter via the configmap.
+
+As before, let's run the operator:
+```bash
+$ bash iteration-2/operator.sh
+```
+
+Ok, but I don't want to wait five days to check whether this is working. I don't want to wait one day for that matter. I want to know now if this works. To check it straight away we can do a small hack on the operator. Simply replace the line with the cronjob schedule 
+```yaml
+
+ schedule: "0 0 */$TIMEINTERVAL * *"
+
+```
+
+with
+
+```yaml
+ schedule: "* * * * *"
+
+```
+
+This cronjob will run every minute and as such in one minute or so I should have my warning message in my inbox. After running the `iteration-2/operator.sh` file again, let's check our email.
+
+![gmail-notifications](assets/gmail-wateringalarm-message.png)
+
 
 Sweet lord, my watering alarms are working and my operator is making sure any creation, update or deletion of a WateringAlarm is reconciled with reality! To be more specific, if I realize my cactus need watering once a month, after I create the cactus-wateringalarm custom resource, the operator will create a cronjob that will spin up a pod which sends me a friendly email reminder to water my cacti.
 
+Operators are a blast! What else can I do? I've been using bash to write them, but I reckon I can write them in other languages. To be honest there must some frameworks that make this entire endeavour even simpler. I hear stuff about Operator SDK in Go as well as Kubebuilder. Also, it would be nice to use an operator to help me in some of the more mundane tasks I do as a software developer, such as spinning new databases.
+
+Let's continue our discoveries together on the next parts of this journey.
+
+/////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////END OF PART 1//////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////
 
 TODO -------------- For the credentials I used a secret. IF HAVE TIME REVISE THIS LAST BIT
 

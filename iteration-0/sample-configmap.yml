@@ -3,4 +3,4 @@ kind: ConfigMap
 metadata:
   name: ricardosdeployment
 data:
-  ricardosReplicas: "1"
+  ricardosReplicas: "3"

@@ -50,7 +50,7 @@ spec:
             command:
             - /bin/sh
             - -c
-            - apt-get update && apt-get --assume-yes install ssmtp && cp /etc/ssmtp-temp/ssmtp.conf /etc/ssmtp/ssmtp.conf && cp /etc/ssmtp-temp/revaliases /etc/ssmtp/revaliases.conf && echo "Get your bum out of the sofa Ricardo, it's time to water the ${PLANT}s" | ssmtp ricardoptcosta@gmail.com
+            - apt-get update && apt-get --assume-yes install ssmtp && cp /etc/ssmtp-temp/ssmtp.conf /etc/ssmtp/ssmtp.conf && cp /etc/ssmtp-temp/revaliases /etc/ssmtp/revaliases.conf && echo "Get your bum out of the sofa Ricardo, it's time to water the ${PLANT}s" | ssmtp <YOUR-GMAIL-USERNAME>@gmail.com
             volumeMounts:
             - name: ssmtp-conf
               mountPath: /etc/ssmtp-temp
