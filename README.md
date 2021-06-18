@@ -4,7 +4,7 @@ This repo is a step by step approach to creating a kubernetes operator following
 
 ## Requirements:
 
-Minikube v1.20 
+Minikube v1.20  
 Kubectl v1.21
 
 
