@@ -4,21 +4,26 @@ This repo is a step by step approach to creating a kubernetes operator following
 
 ## Requirements:
 
-Minikube v1.22+  
-Kubectl
+Minikube v1.20 
+Kubectl v1.21
 
 
-## Iteration 1 
+# WTF is an Operator? I mean, for real! A discovery journey.
 
-What is a Kubernetes operator? People at the office keep talking about it. There are a few concepts I hear that make sense. I hear it takes advantage of Kubernetes control-loop. The control-loop is a mechanism by which Kubernetes compares a desired state of the world with the real state of the world.Take for instance a deployment with 3 pod replicas. Whenever I manually destroy a pod in my local Minikube cluster, another one will be spun off if that pod. Here, initially, the desired state of the world matched the real state of the world, ie, 3 pods. However, once I destroy a pod, the real state of the world is now only 2 pods. As such, the control loop needs to reconcile this mismatch what is desired and what is real. Now, this concept is implemented via a Kubernetes component called the Deployment Controller. This controller watches for any changes both on the resource specifications and on the cluster deployed resources. This is it! Ignoring for now the role of the ReplicaSet controller, the Deployment controller informs the scheduler that it needs to assign a new pod to a suitable node. The scheduler then lets the api server which kubelet it has to instruct to create a new pod.
+What is a Kubernetes operator? People at the office keep talking about it. There are a few concepts I hear that make sense. I hear it takes advantage of Kubernetes control-loop. The control-loop is a mechanism by which Kubernetes compares a desired state of the world with the real state of the world. Take for instance a deployment with 3 pod replicas. Whenever I manually destroy a pod in my local Minikube cluster, another one will be spun off if that pod. Here, initially, the desired state of the world matched the real state of the world, ie, 3 pods. However, once I destroy a pod, the real state of the world is now only 2 pods. As such, the control loop needs to reconcile this mismatch between what is desired and what is real. Now, this concept is implemented via a Kubernetes component called the Deployment Controller. This controller watches for any changes both on the resource specifications and on the cluster deployed resources. This is it! Ignoring for now the role of the ReplicaSet controller, the Deployment controller informs the scheduler that it needs to assign a new pod to a suitable node. The scheduler then lets the api server know which kubelet it has to instruct to create a new pod.
 
-This is a bit intense. Maybe a simple drawing would help clear it out.
+This is a bit intense. Maybe a simple drawing would help clear it out. Please note that many details are overlooked in this depiction.
 
-DEPLOYMENT CONTROLLER FLOW SKETCH HERE
+![deployment-chain-reaction](assets/deployment-controller-flow.png)
+
+Diagram 1. Deployment Chain Reaction
+
 
 I don't know how this deployment controller is implemented, but I think that maybe I could create one myself. This is a big challenge. Where shall I put it? 
 
-I will create a script which will watch for any updates on how many pods of Nginx I want running. How do I pass this information? Configmaps are used to pass information around, so maybe I can use that. I will create a sample configmap yaml which will convey the number of nginx replicas that I want. 
+## Iteration 1 
+
+I will create a script which will watch for any updates on the number of pods wanted. Let's use a Nginx webserver image for simplicity. Now, how will the watcher know where to look for the information on the number of pods wanted? Configmaps are used to pass information around, so maybe I can use that. I will create a sample configmap yaml which will convey the number of Nginx replicas that I want. 
 
 ```yaml
 apiVersion: v1
@@ -33,31 +38,29 @@ Awesome stuff, now that I have the piece of information that I want and the tran
 
 I need to start the script by telling the api server to look for new configmaps, as well as updates and deletions. 
 
-`iteration-0/operator.sh`
+`iteration-1/operator.sh`
 ```bash
 kubectl get --watch --output-watch-events configmap -o=custom-columns=TYPE:type,NAME:object.metadata.name,REPLICAS:object.data.ricardosReplicas 
 ```
 
-With two terminals open, I can run the `kubectl` in one and then I can apply the `sample-configmap.yml` on the other one. On the former, I see it delivers a table in our familiar `kubectl` output format and there it is, a line which states that the configmap regarding ricardosdeployment was added to the configmap resources.
+With two terminals open, I can run the above `kubectl` command in one and then I can apply the `sample-configmap.yml` on the other one. On the former, I see it delivers a table in our familiar `kubectl` output format and there it is, a line which states that the configmap regarding ricardosdeployment was added to the configmap resources.
 
-  | TYPE  | NAME               | REPLICAS |
-  |--|--|--|
-  | ADDED | kube-root-ca.crt   | \<none>   |
-  | ADDED | ricardosdeployment | 3        |
-  |       |                    |          |
+```bash
+TYPE    NAME               REPLICAS
+ADDED   kube-root-ca.crt   <none>
+ADDED   ricardosdeployment   3
+```
 
 This is great. I now want to transpose this information to a replicaset which will create or delete pods in order to make my wishes come true.
 
-To do so, I add a few lines to my script which do the following: 
+To do so, we will add a few lines to the script which will fetch the pieces of data we care about and store them in the variables EVENT, NAME and REPLICAS. With such information, whenever an EVENT takes place to any configmap, for instance whenever I modify the number of replicas from 3 to 2, this script will run and will apply the changes to the real world via a heredoc. If the replicaset already exists it will be updated or deleted. If it doesn't it will be created. 
 
-1. fetch the pieces of data I care about and store them in the variables EVENT, NAME and REPLICAS. With such information, whenever an EVENT takes place to any configmap, for instance whenever I modify the number of replicas from 3 to 2, this script will run and will apply the changes to the real world via a heredoc. If the replicaset already exists it will be updated or deleted. If it doesn't it will be created. 
-
-`iteration-0/operator.sh`
+`iteration-1/operator.sh`
 ```bash
 kubectl get --watch --output-watch-events configmap -o=custom-columns=TYPE:type,NAME:object.metadata.name,REPLICAS=object.data.ricardoReplicas --no-headers | \
 	while read next; do
     EVENT=$(echo $next | cut -d' ' -f1)
-		NAME=$(echo $next | cut -d' ' -f2)
+    NAME=$(echo $next | cut -d' ' -f2)
     REPLICAS=$(echo $next | cut -d' ' -f3)
 	
 		case $EVENT in
@@ -93,37 +96,40 @@ done
 ``` 
 
 
-Let's test our baby.  Start by opening three terminal windows. Then, do the following. In window 1 let's run the operator:  
-`$ bash iteration-0/operator.sh`     
+Let's test our baby.  We start by opening three terminal windows. Then, in window 1 let's run the operator:  
+```bash
+$ bash iteration-1/operator.sh
+```     
       
 Oops!  What's this?
 ```bash 
 The connection to the server localhost:8080 was refused - did you specify the right host or port?
 ```
-In this case, we get this error because we aren't linked to any Kubernetes cluster. We forgot to start minikube. Easy, let's run (from any location):   
-`$ minikube start` 
-
-This command automatically sets `kubectl` config file to point to Minikube's cluster. We run the `bash` command again. Sweet! The operator is running. Now, all we need is to create a configmap with the appropriate format. On window 2 let's create a configmap using our `sample-configmap.yml`:
-
-`$ kubectl apply -f iteration-0/sample-configmap.yml`
-
-We get 
+In this case, we get this error because we aren't linked to any Kubernetes cluster. We forgot to start minikube. Easy, let's run it (from any location):   
 ```bash
+$ minikube start
+``` 
+
+This command automatically sets `kubectl` config file to point to Minikube's cluster. We run the `bash` command again. Sweet! The operator is running. Now, all we need is to create a configmap with the appropriate format. On window 2 let's create a configmap using our `sample-configmap.yml`. We get:
+
+```bash
+$ kubectl apply -f iteration-1/sample-configmap.yml
 configmap/ricardosdeployment created
 ```
-Nice! Let's check whether a replicaset was created and with how many replicas it.
-`$ kubectl get replicasets`
+Nice! Let's check whether a replicaset was created and how many replicas it displays.  
+
 
 ```bash
+$ kubectl get replicasets
 NAME                 DESIRED   CURRENT   READY   AGE
 kube-root-ca.crt     1         1         1       12m
 ricardosdeployment   3         3         3       10s
 ```
 Booyakasha! We've got a replicaset with 3 pods desired and running! Out of curiosity let's see each of the pods.
 
-`$ kubectl get pods`
 
 ```bash
+$ kubectl get pods
 NAME                       READY   STATUS    RESTARTS   AGE
 kube-root-ca.crt-7twj5     1/1     Running   0          12m
 ricardosdeployment-5ds8m   1/1     Running   0          25s
@@ -143,13 +149,12 @@ data:
   ricardosReplicas: "2" //changed from "3" 
 ```
 
-Apply that file 
+Apply that file and check how many pods we have now
 
-`$ kubectl apply -f iteration-0/sample-configmap.yml`
 
-and check how many pods we have now
 
 ```bash
+$ kubectl apply -f iteration-1/sample-configmap.yml
 NAME                       READY   STATUS        RESTARTS   AGE
 kube-root-ca.crt-7twj5     1/1     Running       0          15m
 ricardosdeployment-5ds8m   1/1     Running       0          3m17s
@@ -157,40 +162,19 @@ ricardosdeployment-h87tq   1/1     Running       0          3m17s
 ricardosdeployment-nls2b   0/1     Terminating   0          3m17s
 ```
 Victory! One of the three pods is terminating which will leave us with two pods running just as expected.
- 
-
-<!-- 
-
-------iteration 2
-
-This Kubernetes operator creates, updates and deletes Nginx Deployments based on configmaps that are created, updated and deleted.
-
-In order to test have three terminal windows open:
-- Window 1 - run operator:
-  - $ bash operator.sh
-
-- Window 2 - create, delete or update configmaps:
-  - $ kubectl apply -f sample-configmap.yml
-  - $ kubectl delete -f sample-configmap.yml
-
-- Window 3 - check deployments being created, deleted or updated:
-  - $ kubectl get deployments
-
-
-To see the text written on the configmap displayed on the browser, do port-forwarding -->
 
 
 ## Iteration 2
 
 
-Using an existing kubernetes resources like a ConfigMap is cool. However I can see already a problem. If I were to create a configmap with any other purpose, it would still be picked up by our operator and unpredictable behaviour could follow. In particular, it is easy to imagine unwanted replicasets and pods being created. 
+Using an existing Kubernetes resources like a configMmp is cool. However I can already see a problem. If I were to create a configmap with any other purpose, it would still be picked up by our operator and unpredictable behaviour could follow. In particular, it is easy to imagine unwanted replicasets and pods being created. 
 
 What we really need to do is to create our own custom resource, so that our operator only pays atention to it. 
 
-I could create a new **Custom Resource Definition (CRD)** which would define these new resources. I could now create RicardosConfigMaps for instance. But wait, I can feel that this is powerful, but I still don't get how can I use this to my advantage. All I learnt is that this operator can take care of making sure the number of pods running match what I want. What I came to realise is that the key thing is: I can apply this same rationale to any other type of objects. What object would be simple and useful?
+I could create a new **Custom Resource Definition (CRD)** which would define this new type of resource. I could now create RicardosConfigMaps for instance. But wait, while I can feel that this is powerful I still don't get how can I use this to my advantage. All I learnt is that an operator and a custom resource can take care of making sure the number of pods running match what I want. There must be more tasks I can automate, no? Indeed there are! What I came to realise is that I can apply this same rationale to any other type of resources and tasks. What resource and tasks would be simple and useful?
 
 
-I love plants. I have many plants. I forget to water them when I should. They die. I get sad. I need to address this so that I can get my life in order. Could a Kubernetes Watering Alarm Custom Resource come to the rescue? Just to make clear, there is not Kubernetes Watering Alarm. I will have to create this type of resource by creating the aforementioned CustomResourceDefinition.
+I love plants. I have many plants. I forget to water them when I should. They die. I get sad. I need to address this so that I can get my life in order. Could a Kubernetes Watering Alarm Custom Resource come to the rescue? Just to make it clear, there is not Kubernetes Watering Alarm. I will have to create this type of resource by creating the aforementioned CustomResourceDefinition.
 
 I start by creating a CRD. Below is the full yaml
 
@@ -209,9 +193,7 @@ spec:
   scope: Namespaced
   versions:
   - name: v1
-    # Each version can be enabled/disabled by Served flag.
     served: true
-    # One and only one version must be marked as the storage version.
     storage: true
     schema:
       openAPIV3Schema:
@@ -238,25 +220,23 @@ spec:
         type: date
 ```
 
-CustomResourceDefinitions let the Kubernetes Api Server know what properties custom resources have. In this case, a WateringAlarm will have two base properties: `plant` which states the type of plant this alarm refers to and `timeinterval` which states the time interval in days between waterings.
+Custom Resource Definitions let the Kubernetes Api Server know what properties custom resources have. In this case, a WateringAlarm will have two base properties: `plant` which states the type of plant this alarm refers to and `timeinterval` which states the time interval in days between waterings.
 
-<!-- Note that there is a block called `additionalPrinterColumns`. This block reper -->
 
 Let's deploy it:
-
-`$ kubectl apply -f iteration-2/wateringalarm-crd.yml`
-
-Boom! We have a new CRD. Check `$ kubectl api-resources` to double check we have `wateringalarms` as a new api resource. 
-
 ```bash
-NAME              SHORTNAMES   APIVERSION         NAMESPACED   KIND
+$ kubectl apply -f iteration-2/wateringalarm-crd.yml
+NAME              SHORTNAMES   APIVERSION     NAMESPACED   KIND
 
 ...
 
-wateringalarms                 ric.com/           true         WateringAlarm
+wateringalarms                 ric.com/       true         WateringAlarm
 
 ...
 ```
+
+Boom! We have a new CRD. Check `$ kubectl api-resources` to double check we have `wateringalarms` as a new api resource. 
+
 
 
 All custom resource definitions can also be listed with `$ kubectl get crds`.
@@ -266,7 +246,7 @@ NAME                     CREATED AT
 wateringalarms.ric.com   2021-06-17T13:29:57Z
 ```
 
-Now, we can go ahead and create custom resources of type WateringAlarm. In this case we will build an alarms for orchids and succulents. 
+Now, we can go ahead and create custom resources of type WateringAlarm. In this case we will build alarms for orchids and succulents. 
 
 `iteration-1/orchid-wateringalarm.yml`
 ```yaml
@@ -293,12 +273,15 @@ apiVersion: "ric.com/v1"
 ```
 These reflect the fact that succulents need watering every five days while orchids once a week. Now, I create these resources:
 
-`$ kubectl apply -f iteration-2/orchid-wateringalarm.yml && kubectl apply -f iteration-2/succulent-wateringalarm.yml`
+```bash
+$ kubectl apply -f iteration-2/orchid-wateringalarm.yml \
+       && kubectl apply -f iteration-2/succulent-wateringalarm.yml
+```
 
 And let's check what happens when:
 
-`$ kubectl get wateringalarms`
 ```bash
+$ kubectl get wateringalarms
 NAME                      PLANT       TIMEINTERVAL   AGE
 orchid-wateringalarm      orchid      7              12s
 succulent-wateringalarm   succulent   5              12s
@@ -306,7 +289,7 @@ succulent-wateringalarm   succulent   5              12s
 
 Neat!
 
-Now, I have the resources created, how do I take advantage of the operator pattern to leverage them? Easy, same as before:
+Now hat I have the resources created, how do I take advantage of the operator pattern to leverage them? Easy, same as before:
 1. Create a watcher on the operator
 2. Do something when the the watcher identifies a change
 
@@ -390,7 +373,7 @@ done
 This is a more intense file. However, the principles are the same.
 There is a watcher and there is stuff that is done whenever a custom resource is created, updated or deleted. The custom resource here refers to a WateringAlarm. The stuff that is done refers to the creation, update or deletion of a configmap and a cronjob. Any time a a WateringAlarm is created or updated the watcher deploys or updates a cronjob which will be triggered every time the `timeinterval` defined in the WateringAlarm runs out. It deletes the cronjob whenever a WateringAlarm resource is deleted. 
 
-Since I need the container created by the cronjob to notify me somehow, I decided to use my Gmail account as an email server. In order to send me an email reminding me about watering the plants, I used an ubuntu image and installed ssmpt. There is a bunch of configuration required for the email protocol. See this [link](https://www.havetheknowhow.com/Configure-the-server/Install-ssmtp.html). Following that link, I created a configmap from the files `/etc/ssmtp/revaliases` and ` /etc/ssmtp/ssmtp.conf` and pasted it on the `iteration-2/operator.sh` file with the name `ssmtp-conf`. All in all,these files were mounted on the containter via the configmap.
+Since I need the container created by the cronjob to notify me somehow, I decided to use my Gmail account as an email server. In order to send me an email reminding me about watering the plants, I used an ubuntu image and installed ssmpt. There is a bunch of configuration required for the email protocol. See this [link](https://www.havetheknowhow.com/Configure-the-server/Install-ssmtp.html). Following that link, I created a configmap from the files `/etc/ssmtp/revaliases` and ` /etc/ssmtp/ssmtp.conf` and pasted it on the `iteration-2/operator.sh` file with the name `ssmtp-conf`. In other words, these files were mounted on the containter via the configmap.
 
 As before, let's run the operator:
 ```bash
